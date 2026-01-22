@@ -89,7 +89,7 @@ export default function ShareCard({ data, type, onClose }) {
               </svg>
               <span className="font-semibold text-white text-sm">Paperhand</span>
             </div>
-            <span className="text-[10px] text-gray-500">paperhand.meme</span>
+            <span className="text-[10px] text-gray-500">paperhand.site</span>
           </div>
 
           {/* Token Info */}

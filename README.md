@@ -2,9 +2,7 @@
 
 Practice trading Solana memecoins without risking real money.
 
-**Live:** [paperhand.meme](https://paperhand.meme)
-
-![Paperhand Screenshot](https://i.imgur.com/placeholder.png)
+**Live:** [paperhand.site](https://paperhand.site)
 
 ## Features
 
@@ -62,7 +60,7 @@ MIT
 
 ## Links
 
-- Website: [paperhand.meme](https://paperhand.meme)
+- Website: [paperhand.site](https://paperhand.site)
 - Twitter: [@figuregpt](https://x.com/figuregpt)
 
 ---
