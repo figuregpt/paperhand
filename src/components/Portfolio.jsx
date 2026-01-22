@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceDot } from 'recharts'
 import useStore from '../store/useStore'
 import { formatUSD, formatNumber, formatPrice, fetchTokenData } from '../services/api'
+import ShareCard from './ShareCard'
 
 export default function Portfolio({ onTokenSelect }) {
   const { holdings, transactions, portfolioHistory, tokens, balance, setSelectedToken } = useStore()
   const [activeView, setActiveView] = useState('holdings')
   const [holdingPrices, setHoldingPrices] = useState({})
+  const [shareData, setShareData] = useState(null)
 
   // Fetch current prices for all holdings
   useEffect(() => {
@@ -244,10 +246,12 @@ export default function Portfolio({ onTokenSelect }) {
                 return (
                   <div
                     key={holding.tokenAddress}
-                    onClick={() => handleHoldingClick(holding)}
-                    className="flex items-center justify-between p-3 bg-[#16161d] rounded cursor-pointer hover:bg-[#1e1e26] transition-colors"
+                    className="flex items-center justify-between p-3 bg-[#16161d] rounded hover:bg-[#1e1e26] transition-colors"
                   >
-                    <div className="flex items-center gap-3">
+                    <div
+                      className="flex items-center gap-3 flex-1 cursor-pointer"
+                      onClick={() => handleHoldingClick(holding)}
+                    >
                       <img
                         src={holding.image}
                         alt={holding.symbol}
@@ -263,11 +267,34 @@ export default function Portfolio({ onTokenSelect }) {
                         </div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-sm font-medium text-white">{formatUSD(currentValue)}</div>
-                      <div className={`text-xs ${pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                        {pnl >= 0 ? '+' : ''}{formatUSD(pnl)} ({pnlPercent >= 0 ? '+' : ''}{pnlPercent.toFixed(2)}%)
+                    <div className="flex items-center gap-2">
+                      <div className="text-right" onClick={() => handleHoldingClick(holding)}>
+                        <div className="text-sm font-medium text-white">{formatUSD(currentValue)}</div>
+                        <div className={`text-xs ${pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                          {pnl >= 0 ? '+' : ''}{formatUSD(pnl)} ({pnlPercent >= 0 ? '+' : ''}{pnlPercent.toFixed(2)}%)
+                        </div>
                       </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setShareData({
+                            type: 'holding',
+                            data: {
+                              symbol: holding.symbol,
+                              image: holding.image,
+                              amount: holding.amount,
+                              avgBuyPrice: holding.avgBuyPrice,
+                              currentPrice: currentPrice
+                            }
+                          })
+                        }}
+                        className="p-1.5 text-gray-500 hover:text-white hover:bg-[#2a2a36] rounded transition-colors"
+                        title="Share P&L"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                        </svg>
+                      </button>
                     </div>
                   </div>
                 )
@@ -297,22 +324,48 @@ export default function Portfolio({ onTokenSelect }) {
                       </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className={`text-sm font-medium ${tx.type === 'BUY' ? 'text-red-500' : 'text-green-500'}`}>
-                      {tx.type === 'BUY' ? '-' : '+'}{formatUSD(tx.total)}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {new Date(tx.timestamp).toLocaleString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </div>
-                    {tx.pnl !== undefined && (
-                      <div className={`text-xs ${tx.pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                        P&L: {tx.pnl >= 0 ? '+' : ''}{formatUSD(tx.pnl)}
+                  <div className="flex items-center gap-2">
+                    <div className="text-right">
+                      <div className={`text-sm font-medium ${tx.type === 'BUY' ? 'text-red-500' : 'text-green-500'}`}>
+                        {tx.type === 'BUY' ? '-' : '+'}{formatUSD(tx.total)}
                       </div>
+                      <div className="text-xs text-gray-500">
+                        {new Date(tx.timestamp).toLocaleString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </div>
+                      {tx.pnl !== undefined && (
+                        <div className={`text-xs ${tx.pnl >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                          P&L: {tx.pnl >= 0 ? '+' : ''}{formatUSD(tx.pnl)}
+                        </div>
+                      )}
+                    </div>
+                    {tx.type === 'SELL' && tx.pnl !== undefined && (
+                      <button
+                        onClick={() => setShareData({
+                          type: 'transaction',
+                          data: {
+                            symbol: tx.symbol,
+                            image: `https://dd.dexscreener.com/ds-data/tokens/solana/${tx.tokenAddress}.png`,
+                            amount: tx.amount,
+                            price: tx.price,
+                            total: tx.total,
+                            pnl: tx.pnl,
+                            type: tx.type,
+                            avgBuyPrice: tx.price - (tx.pnl / tx.amount),
+                            pnlPercent: (tx.pnl / (tx.total - tx.pnl)) * 100
+                          }
+                        })}
+                        className="p-1.5 text-gray-500 hover:text-white hover:bg-[#2a2a36] rounded transition-colors"
+                        title="Share P&L"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                        </svg>
+                      </button>
                     )}
                   </div>
                 </div>
@@ -325,6 +378,15 @@ export default function Portfolio({ onTokenSelect }) {
           </div>
         )}
       </div>
+
+      {/* Share Card Modal */}
+      {shareData && (
+        <ShareCard
+          data={shareData.data}
+          type={shareData.type}
+          onClose={() => setShareData(null)}
+        />
+      )}
     </div>
   )
 }
