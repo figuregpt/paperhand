@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { toPng } from 'html-to-image'
 import { formatUSD, formatNumber, formatPrice } from '../services/api'
 
@@ -6,6 +6,48 @@ export default function ShareCard({ data, type, onClose }) {
   const cardRef = useRef(null)
   const [copying, setCopying] = useState(false)
   const [downloaded, setDownloaded] = useState(false)
+  const [imageBase64, setImageBase64] = useState(null)
+
+  // Generate fallback SVG as base64
+  const generateFallbackImage = (symbol) => {
+    const letter = (symbol || '?')[0].toUpperCase()
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+      <rect width="48" height="48" rx="24" fill="#1e1e26"/>
+      <text x="24" y="24" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="white" text-anchor="middle" dominant-baseline="central">${letter}</text>
+    </svg>`
+    return `data:image/svg+xml;base64,${btoa(svg)}`
+  }
+
+  // Pre-load image as base64 to avoid CORS issues
+  useEffect(() => {
+    const loadImage = async () => {
+      // First, set a local fallback immediately
+      setImageBase64(generateFallbackImage(data.symbol))
+
+      try {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.src = data.image
+
+        await new Promise((resolve, reject) => {
+          img.onload = resolve
+          img.onerror = reject
+          // Timeout after 3 seconds
+          setTimeout(() => reject(new Error('timeout')), 3000)
+        })
+
+        const canvas = document.createElement('canvas')
+        canvas.width = img.width || 48
+        canvas.height = img.height || 48
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0)
+        setImageBase64(canvas.toDataURL('image/png'))
+      } catch {
+        // Keep the fallback that was already set
+      }
+    }
+    loadImage()
+  }, [data.image, data.symbol])
 
   // type: 'holding' | 'transaction'
   const isHolding = type === 'holding'
@@ -20,16 +62,32 @@ export default function ShareCard({ data, type, onClose }) {
 
   const isProfit = pnl >= 0
 
+  const generateImage = async () => {
+    if (!cardRef.current) return null
+
+    return await toPng(cardRef.current, {
+      quality: 1,
+      pixelRatio: 2,
+      backgroundColor: '#0b0b0f',
+      cacheBust: true,
+      skipFonts: true,
+      filter: (node) => {
+        // Skip external images that might cause CORS issues
+        if (node.tagName === 'IMG' && node.src && !node.src.startsWith('data:')) {
+          return false
+        }
+        return true
+      }
+    })
+  }
+
   const downloadImage = async () => {
     if (!cardRef.current) return
 
     try {
       setCopying(true)
-      const dataUrl = await toPng(cardRef.current, {
-        quality: 1,
-        pixelRatio: 2,
-        backgroundColor: '#0b0b0f'
-      })
+      const dataUrl = await generateImage()
+      if (!dataUrl) return
 
       const link = document.createElement('a')
       link.download = `paperhand-${data.symbol}-pnl.png`
@@ -49,11 +107,8 @@ export default function ShareCard({ data, type, onClose }) {
 
     try {
       setCopying(true)
-      const dataUrl = await toPng(cardRef.current, {
-        quality: 1,
-        pixelRatio: 2,
-        backgroundColor: '#0b0b0f'
-      })
+      const dataUrl = await generateImage()
+      if (!dataUrl) return
 
       const blob = await (await fetch(dataUrl)).blob()
       await navigator.clipboard.write([
@@ -95,7 +150,7 @@ export default function ShareCard({ data, type, onClose }) {
           {/* Token Info */}
           <div className="flex items-center gap-3 mb-4">
             <img
-              src={data.image}
+              src={imageBase64 || data.image}
               alt={data.symbol}
               className="w-12 h-12 rounded-full bg-[#1e1e26]"
               onError={(e) => {
